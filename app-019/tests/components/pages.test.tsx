@@ -95,6 +95,64 @@ describe('编辑器：参数改动即时重算 + 脏状态提示 + 齿宽表', (
     render(<EditorPage id="nonexistent" />)
     expect(screen.getByText('方案不存在或已删除')).toBeInTheDocument()
   })
+
+  it('余量表备份缺格：六格输入框仍全部有值，编辑器不白屏且图纸照常出榫厚', async () => {
+    // 模拟从备份恢复、缺了一格（hardwood.tight）的旧表
+    localStorage.setItem(
+      'wjb.fittable.v1',
+      JSON.stringify({
+        hardwood: { standard: 0, loose: -0.3 },
+        softwood: { tight: 0.3, standard: 0, loose: -0.4 },
+      }),
+    )
+    const plan = makePlan('mortise-tenon', {
+      boardA: { thickness: 20, width: 120 },
+      boardB: { thickness: 18, width: 120 },
+      wood: 'hardwood',
+      fit: 'tight',
+      kerfMm: 1.1,
+    })
+    upsertPlan(plan)
+
+    expect(() => render(<EditorPage id={plan.id} />)).not.toThrow()
+    expect(screen.getByTestId('editor-page')).toBeInTheDocument()
+
+    // 六格永远有值（不出现空白输入框）
+    for (const w of ['hardwood', 'softwood']) {
+      for (const f of ['tight', 'standard', 'loose']) {
+        const input = screen.getByLabelText(`${w}-${f}`) as HTMLInputElement
+        expect(input.value).not.toBe('')
+        expect(Number.isFinite(Number(input.value))).toBe(true)
+      }
+    }
+    // 缺格补的是出厂默认 0.2
+    expect((screen.getByLabelText('hardwood-tight') as HTMLInputElement).value).toBe('0.2')
+
+    // 图纸照常渲染：三视图都在，且有榫厚标注（不是空白图）
+    expect(screen.getByTestId('views').textContent).toMatch(/榫厚 \d/)
+
+    // 参数仍可修改（页面没被坏数据带崩）
+    const user = userEvent.setup()
+    await user.clear(screen.getByTestId('a-width'))
+    await user.type(screen.getByTestId('a-width'), '150')
+    expect(screen.getByTestId('dirty-bar')).toBeInTheDocument()
+  })
+
+  it('余量表 JSON 整体损坏：编辑器退回默认表，不白屏', () => {
+    localStorage.setItem('wjb.fittable.v1', '{bad json')
+    const plan = makePlan('mortise-tenon', {
+      boardA: { thickness: 20, width: 120 },
+      boardB: { thickness: 18, width: 120 },
+      wood: 'hardwood',
+      fit: 'tight',
+      kerfMm: 1.1,
+    })
+    upsertPlan(plan)
+
+    expect(() => render(<EditorPage id={plan.id} />)).not.toThrow()
+    expect(screen.getByTestId('editor-page')).toBeInTheDocument()
+    expect((screen.getByLabelText('hardwood-tight') as HTMLInputElement).value).toBe('0.2')
+  })
 })
 
 describe('列表页：筛选 + 删除 + 导入', () => {

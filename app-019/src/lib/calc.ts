@@ -3,7 +3,7 @@ import type { Joint } from '../types'
 import { computeDovetail, type DovetailResult } from './dovetail'
 import { computeTenon, type TenonResult } from './tenon'
 import { computeLap, computeDowel, computePanel, type LapResult, type DowelResult, type PanelResult } from './joints'
-import { loadFitTable } from './fit'
+import { loadFitTable, fitDelta } from './fit'
 
 export type JointResult = {
   dovetail?: DovetailResult
@@ -46,13 +46,7 @@ export function computeJoint(joint: Joint): JointResult {
         kerf: params.kerfMm,
         wood: params.wood,
         fit: params.fit,
-        fitDeltaMm: (() => {
-        const row = table[params.wood];
-        if (!row) return 0;
-        const delta = row[params.fit];
-        if (typeof delta !== 'number' || Number.isNaN(delta)) return 0;
-        return delta;
-      })(),
+        fitDeltaMm: fitDelta(table, params.wood, params.fit),
       })
       result.tenon = tn
       result.warnings = tn.warnings

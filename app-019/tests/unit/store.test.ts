@@ -88,6 +88,46 @@ describe('配合余量表（可编辑经验值，蓝图 §8）', () => {
     localStorage.setItem('wjb.fittable.v1', '{bad json')
     expect(loadFitTable()).toEqual(DEFAULT_FIT_TABLE)
   })
+  it('备份表缺一格：缺的格子按出厂默认补，其他用户值保留（六格永远有数）', () => {
+    // 用户改过 hardwood.standard=0.1，但备份里 hardwood.tight 整个缺失
+    localStorage.setItem(
+      'wjb.fittable.v1',
+      JSON.stringify({ hardwood: { standard: 0.1, loose: -0.3 } }),
+    )
+    const t = loadFitTable()
+    expect(t.hardwood.tight).toBe(DEFAULT_FIT_TABLE.hardwood.tight)
+    expect(t.hardwood.standard).toBe(0.1)
+    expect(t.hardwood.loose).toBe(-0.3)
+    // 整行缺失 → 整行用默认
+    expect(t.softwood).toEqual(DEFAULT_FIT_TABLE.softwood)
+    // 六格都是有限数
+    for (const w of ['hardwood', 'softwood'] as const) {
+      for (const f of ['tight', 'standard', 'loose'] as const) {
+        expect(Number.isFinite(t[w][f])).toBe(true)
+      }
+    }
+  })
+  it('格值是 null/字符串/NaN → 该格回退默认值', () => {
+    localStorage.setItem(
+      'wjb.fittable.v1',
+      JSON.stringify({
+        hardwood: { tight: null, standard: '坏', loose: NaN },
+        softwood: 'not-a-row',
+      }),
+    )
+    expect(loadFitTable()).toEqual(DEFAULT_FIT_TABLE)
+  })
+  it('读到缺格/坏数据后自愈：localStorage 被重写为六格齐全的表', () => {
+    localStorage.setItem('wjb.fittable.v1', JSON.stringify({ hardwood: { tight: 0.25 } }))
+    loadFitTable()
+    const repaired = JSON.parse(localStorage.getItem('wjb.fittable.v1') || '{}')
+    for (const w of ['hardwood', 'softwood'] as const) {
+      for (const f of ['tight', 'standard', 'loose'] as const) {
+        expect(typeof repaired[w][f]).toBe('number')
+      }
+    }
+    expect(repaired.hardwood.tight).toBe(0.25)
+  })
 })
 
 describe('性能验收：参数改动到图纸重算 < 100ms（蓝图 §10）', () => {
