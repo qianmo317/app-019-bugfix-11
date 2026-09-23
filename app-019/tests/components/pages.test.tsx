@@ -95,6 +95,59 @@ describe('编辑器：参数改动即时重算 + 脏状态提示 + 齿宽表', (
     render(<EditorPage id="nonexistent" />)
     expect(screen.getByText('方案不存在或已删除')).toBeInTheDocument()
   })
+
+  it('余量表 JSON 损坏 → 编辑器不白屏，图纸照出、参数可改', () => {
+    const { id } = (() => {
+      const plan = makePlan('mortise-tenon', {
+        boardA: { thickness: 20, width: 120 },
+        boardB: { thickness: 18, width: 120 },
+        wood: 'hardwood',
+        fit: 'tight',
+        kerfMm: 1.1,
+      })
+      upsertPlan(plan)
+      return plan
+    })()
+    localStorage.setItem('wjb.fittable.v1', '{坏数据')
+    expect(() => render(<EditorPage id={id} />)).not.toThrow()
+
+    // 页面在、三视图在（没有 NaN 导致整图消失）
+    expect(screen.getByTestId('editor-page')).toBeInTheDocument()
+    expect(screen.getByTestId('views')).toBeInTheDocument()
+    // 默认紧配 +0.2 → 6.9，图纸标注按 0.5mm 步进显示为 7
+    expect(screen.getByText(/榫厚 7（含配合）/)).toBeInTheDocument()
+    expect(document.querySelector('[data-view="front"]')).toBeInTheDocument()
+
+    // 余量表六格都有值（不再是空白输入框）
+    const cell = screen.getByLabelText('hardwood-tight') as HTMLInputElement
+    expect(cell.value).toBe('0.2')
+
+    // 参数仍可修改（白屏时连参数都改不了）
+    const ratio = screen.getByTestId('tn-ratio') as HTMLInputElement
+    fireEvent.change(ratio, { target: { value: '0.4' } })
+    expect(ratio.value).toBe('0.4')
+  })
+
+  it('备份表缺一格 → 缺格自动补默认，编辑器正常出图', () => {
+    const plan = makePlan('mortise-tenon', {
+      boardA: { thickness: 20, width: 120 },
+      boardB: { thickness: 18, width: 120 },
+      wood: 'hardwood',
+      fit: 'tight',
+      kerfMm: 1.1,
+    })
+    upsertPlan(plan)
+    localStorage.setItem(
+      'wjb.fittable.v1',
+      JSON.stringify({
+        hardwood: { standard: 0, loose: -0.3 /* 缺 tight */ },
+        softwood: { tight: 0.3, standard: 0, loose: -0.4 },
+      }),
+    )
+    expect(() => render(<EditorPage id={plan.id} />)).not.toThrow()
+    expect((screen.getByLabelText('hardwood-tight') as HTMLInputElement).value).toBe('0.2')
+    expect(screen.getByText(/榫厚 7（含配合）/)).toBeInTheDocument() // 6.9 经 0.5mm 标注步进显示为 7
+  })
 })
 
 describe('列表页：筛选 + 删除 + 导入', () => {

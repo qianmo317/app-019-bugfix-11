@@ -10,7 +10,7 @@ import { getPlan, upsertPlan, downloadJSON, deletePlan } from '../store/plans'
 import { navigate } from '../router'
 import { ViewSvg, CheckRuler } from '../components/ViewSvg'
 import { ParamForm } from '../components/ParamForm'
-import { DEFAULT_FIT_TABLE, WOOD_LABEL, loadFitTable, saveFitTable, type FitTable } from '../lib/fit'
+import { cloneDefaultTable, WOOD_LABEL, loadFitTable, saveFitTable, type FitTable } from '../lib/fit'
 
 export function EditorPage({ id }: { id: string }) {
   const [plan, setPlan] = useState<Drawing | undefined>(() => getPlan(id))
@@ -245,7 +245,7 @@ export function FitTableEditor() {
         >
           保存余量表
         </button>
-        <button className="btn btn-sm" onClick={() => setTable(DEFAULT_FIT_TABLE)}>恢复默认</button>
+        <button className="btn btn-sm" onClick={() => setTable(cloneDefaultTable())}>恢复默认</button>
         {saved && <span className="ok">已保存</span>}
       </div>
       <p className="note">来源：木工经验值（非标准规范）。榫厚 = 料厚×比例 + 表值。</p>
